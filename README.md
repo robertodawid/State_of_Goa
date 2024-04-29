@@ -40,5 +40,5 @@ In this version of the model, a python notebook is provided to vizualize results
 ```
 ./scripts/visualizarion_csv_Goa.ipynb
 ```
-[^1] D. Dreier, M. Howells, Osemosys-Pulp: A Stochastic Modeling Framework for long-term Energy Systems Modeling, Energies. 12 (2019) 1382. doi:10.3390/en12071382. 
-[^2]M. Howells, H. Rogner, N. Strachan, C. Heaps, H. Huntington, S. Kypreos, et al., OSeMOSYS: The Open Source Energy Modeling System, Energy Policy. 39 (2011) 5850–5870. doi:10.1016/j.enpol.2011.06.033. 
+[^1]: D. Dreier, M. Howells, Osemosys-Pulp: A Stochastic Modeling Framework for long-term Energy Systems Modeling, Energies. 12 (2019) 1382. doi:10.3390/en12071382. 
+[^2]: M. Howells, H. Rogner, N. Strachan, C. Heaps, H. Huntington, S. Kypreos, et al., OSeMOSYS: The Open Source Energy Modeling System, Energy Policy. 39 (2011) 5850–5870. doi:10.1016/j.enpol.2011.06.033. 
