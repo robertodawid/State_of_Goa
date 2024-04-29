@@ -2,17 +2,17 @@
 ![Alt text](./figures/F1_methodology.png)
 *Figure 1. State of Goa-model development methodology*
 
-This repository presents a open-source energy models explicitly developed for the State of Goa (India) Kenya. The energy model consists of several sectors such as, building (residential + commercial), cooking, industry, agriculture, fisheries, and transport. This energy system model was develped to be used wiht OSeMOSYS-pulp [^1].
+This repository presents an open-source energy model explicitly developed for the State of Goa (India). The energy model consists of several sectors, such as building (residential + commercial), cooking, industry, agriculture, fisheries, and transport. This energy system model was developed to be used with OSeMOSYS-pulp [^1].
 
 ## Input data
 The input data is a **.xlsx* file located in:
 ```
 ./model/Input_Data/
 ```
-The input data contains all the parameters necessary to run the optimization. Documentation regarding the parameters are similar to those found in the original [OSeMOSYS-GNU](https://osemosys.readthedocs.io/en/latest/) [^2].
+The input data contains all the parameters necessary to run the optimization. The documentation regarding the parameters is similar to that found in the original version  [OSeMOSYS-GNU](https://osemosys.readthedocs.io/en/latest/) [^2].
 
 ## Model file
-The model file is a updated version of OSeMOSYS pulp. Several updted were made to speed up optimization regarding matrix gerenation time, and post-processing. Now, this version is comparable to the short version of OSeMOSYS-GNU. The model file is located in:
+The model file represents an enhanced version of OSeMOSYS pulp. Notable improvements have been implemented to accelerate optimization in terms of matrix generation time and post-processing. This updated version now stands on par with the short version of OSeMOSYS-GNU, showcasing the continuous evolution and refinement of the model. The model file can be found at:
 ```
 ./model/OSeMOSYS.py/
 ```
@@ -22,7 +22,7 @@ Other dependencies and functions are located in:
 ```
 
 ## Run the model
-The working directory should be set in ./model. It is advisible to create a new enviroment and install the libraries such as pulp.
+Creating a new environment and installing libraries such as pulp is advisable.
 ```
 conda create --name pulp python=3.8
 ```
@@ -30,13 +30,13 @@ Activate the new environment to use it
 ```
 conda activate pulp
 ```
- run the following code, and to use other solvers type instead of cplex, gurobi, or cbc. The result file is a **.csv* file save in the path *./Output_Data/GOA_COMPLETE_updated_results.csv*
+Run the following code, and to use other solvers, type instead of, Cplex, gurobi, or CBC. The result file is a **.csv* file saved in the path *./Output_Data/GOA_COMPLETE_updated_results.csv*
 ```
 python OSeMOSYS.py -i GOA_COMPLETE_updated.xlsx -s cplex -o csv
 ```
 
-## Vizualize results
-In this version of the model, a python notebook is provided to vizualize results. The notebook is located in the following path:
+## Visualize results
+In this version of the model, a Python notebook is provided to visualize the results. The notebook is located in the following path:
 ```
 ./scripts/visualizarion_csv_Goa.ipynb
 ```
