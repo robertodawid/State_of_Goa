@@ -1,0 +1,1145 @@
+---
+title: "Goa Results Visualizations"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+This data was gathered for Kenya.
+
+# Libraries
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggpmisc) #annotations
+library(RColorBrewer)
+library(ggcorrplot)
+library(ggpubr)
+library(grid)
+library(gridExtra)
+
+#library(forecast)
+library(readxl)
+```
+
+```{r}
+source("my_theme.R")
+```
+
+# Year Vector
+
+```{r}
+year_vector <-  c(2019, 2025, 2030, 2035, 2040, 2045, 2050)
+```
+
+### Scenario Name
+
+```{r}
+sc_bau <- "Bau"
+sc_nm <- "RE"
+```
+
+# Power Sector
+
+```{r}
+bau_PbT <- read.csv("./results/bau_PbT.csv")
+bau_PbT["Scenario"] = sc_bau 
+
+re_PbT <- read.csv("./results/re_PbT.csv")
+re_PbT["Scenario"] = sc_nm
+
+PbT = rbind(bau_PbT, re_PbT)
+```
+
+# High resolution
+
+```{r message=FALSE, warning=FALSE}
+
+# List of keys
+keys <- c("re_PbT_72", "re_PbT_144", "re_PbT_288")  
+
+for (i in seq_along(keys)) {
+
+  # Assign the name of the data frame using the current key
+  assign(keys[i], read.csv(paste0("./results/", keys[i], ".csv")))
+}
+```
+
+```{r}
+P_tech_names <- c("Small hydro", "Solar-PV Agriculture", "Solar-PV Commercial",
+                  "Solar-PV Residential", "Solar RPO", "Solar-ground+float",
+                  "Wind Goa", "Wind RPO", "Wind Tech", "Solar Tech", "Biomass PP",
+                  "RE-Imports", "IEX-Imports", "Nuclear", "Diesel", "CCGT", 
+                  "Import Coal PP", "Coal PP")
+
+```
+
+```{r}
+#
+#2019
+#
+# bau_PbT <- read.csv("./results/bau_PbT.csv")
+# 
+# bau_PbT <- bau_PbT %>% filter(!YEAR==2019)
+# 
+# 
+# re_PbT <- read.csv("./results/re_PbT.csv")
+# new3 <- re_PbT %>% filter(YEAR==2019)
+# 
+# bau_PbT <- rbind(bau_PbT, new3)
+# 
+# bau_PbT["Scenario"] = sc_bau 
+# re_PbT["Scenario"] = sc_nm
+# 
+# PbT = rbind(bau_PbT, re_PbT)
+```
+
+```{r}
+PbT_f <-  PbT %>%
+    filter(YEAR %in% year_vector) %>%
+    group_by(YEAR, Tech_name, Scenario) %>% 
+    summarise(VALUE=sum(VALUE)) %>% 
+    mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d(direction = -1) +
+   labs(fill = "", x="", y = "Generation [PJ]") +
+   facet_grid(.~YEAR) +
+   rh_theme +
+  
+   guides(fill = guide_legend(ncol = 7))  +
+   theme(axis.text.x = element_text(angle = 90, size = 5), 
+         legend.margin = margin(t=-5, b=0, unit='mm'))
+PbT_f
+
+```
+
+```{r}
+PbT %>% filter(YEAR %in% year_vector) %>%
+    group_by(YEAR, Tech_name, Scenario) %>% 
+    summarise(VALUE=sum(VALUE)) %>% filter(YEAR==2019) %>% filter(Scenario=='Bau')
+```
+
+```{r}
+# Coal contribution
+PbT %>% filter(YEAR==2050) %>% filter(Tech_name=='Import Coal PP') %>% group_by(Scenario) %>% summarise(sum(VALUE))
+
+PbT %>% filter(YEAR==2050) %>% group_by(Tech_name,Scenario) %>% summarise(sum(VALUE))
+
+PbT %>% filter(YEAR==2050) %>% filter(Scenario=='RE') %>% group_by(Tech_name,Scenario) %>% summarise(sum(VALUE))
+
+PbT %>% filter(YEAR==2050) %>% filter(Scenario=='Bau') %>% group_by(Tech_name,Scenario) %>% summarise(sum(VALUE))
+
+
+
+```
+
+## Prod by Tech
+
+### Figure
+
+```{r}
+ggsave(PbT_f, filename = './figures/Pro_b_Tech.jpg', width = 12, height = 8, units = 'cm' )
+ggsave(PbT_f, filename = './figures/Pro_b_Tech.pdf', width = 12, height = 8, units = 'cm' )
+```
+
+## Prod by Tech Time slice
+
+### Figure
+
+the common.legend=TRUE argument takes the legend from the first plot in the series.
+
+```{r}
+PbT_ts_f <- PbT %>%
+  filter(YEAR ==2045) %>%
+  filter(Scenario=='RE') %>% 
+  mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+  ggplot(aes(x=TIMESLICE, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+  scale_fill_viridis_d(direction = -1) +
+  labs(title="12 TS",fill = "", x="", y = "") +
+  rh_theme +
+  theme(legend.margin = margin(t=-5, b=0, unit='mm'),
+        plot.title = element_text(hjust=0, vjust = -3, size = 5),
+        legend.text = element_text(size = 4, face = "plain"))+
+  scale_x_continuous(breaks=seq(0,12,1)) +
+  guides(fill = guide_legend(ncol = 6))
+PbT_ts_f
+```
+
+```{r}
+
+```
+
+## High resolution
+
+```{r}
+#get common legend
+leg <- get_legend(PbT_ts_f)
+
+PbT_72 <- plot_PbT(re_PbT_72, 2045, "72 TS", 6, lw=0.01, width = 1) +
+  scale_x_continuous(breaks=seq(0,72,6))
+  
+  
+PbT_144 <- plot_PbT(re_PbT_144, 2045, "144 TS", 6, lw=0.01, width = 1) +
+   scale_x_continuous(breaks=seq(0,144,12))
+  
+
+PbT_288 <- plot_PbT(re_PbT_288, 2045, "288 TS", 6, lw=0.001, width = 1) +
+  scale_x_continuous(breaks=seq(0,288,24))
+
+```
+
+```{r}
+PbT_288
+```
+
+```{r}
+PbT_ts_f1 <- PbT_ts_f + geom_bar(stat = "identity",
+                    linewidth = 0.001,
+                    width = 0.4)
+```
+
+### Figure PbT HR 2045
+
+annotate figure:
+
+<http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/81-ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page/#annotate-the-arranged-figure>
+
+```{r}
+empty <- ggplot()+theme_void()
+gap <- -0.15
+
+PbT_HR <- ggarrange(PbT_ts_f1, empty,
+                    PbT_72, empty,
+                    PbT_144, empty,
+                    PbT_288, 
+                    #leg,
+                    nrow = 7,
+                    #legend = "bottom",
+                    labels = c('E', '', 'F', '', 'G', '', 'H', ''
+                               ),
+                    font.label=list(size=6),
+                    align = "v",
+                    #common.legend=TRUE,
+                    legend = 'none',
+                    heights = c(1,gap,
+                                1,gap,
+                                1,gap,
+                                1
+                                #,0.15
+                                ))
+PbT_HR <- annotate_figure(PbT_HR,
+                left = text_grob('Generation by Timeslice 2045 [PJ]', size=6, rot = 90))
+PbT_HR
+```
+
+```{r}
+# ggsave(PbT_HR, filename = './figures/PbT_HR.jpg', width = 12, height = 8.5, units = 'cm' )
+# ggsave(PbT_HR, filename = './figures/PbT_HR.pdf', width = 12, height = 8.5, units = 'cm' )
+```
+
+### Figure PbT HR 2025
+
+```{r}
+PbT2_ts_f <- PbT %>%
+  filter(YEAR ==2025) %>%
+  filter(Scenario=='RE') %>% 
+  mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+  ggplot(aes(x=TIMESLICE, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+  scale_fill_viridis_d(direction = -1) +
+  labs(title="12 TS",fill = "", x="", y = "") +
+  rh_theme +
+  theme(legend.margin = margin(t=-5, b=0, unit='mm'),
+        plot.title = element_text(hjust=0, vjust = -3, size = 5))+
+  scale_x_continuous(breaks=seq(0,12,1)) +
+  guides(fill = guide_legend(ncol = 6))
+
+```
+
+```{r}
+leg2 <- get_legend(PbT2_ts_f)
+
+PbT2_72 <- plot_PbT(re_PbT_72, 2025, "72 TS", 6, lw=0.01, width = 1) +
+  scale_x_continuous(breaks=seq(0,72,6))
+  
+  
+PbT2_144 <- plot_PbT(re_PbT_144, 2025, "144 TS", 6, lw=0.01, width = 1) +
+   scale_x_continuous(breaks=seq(0,144,12))
+  
+
+PbT2_288 <- plot_PbT(re_PbT_288, 2025, "288 TS", 6, lw=0.01, width = 1) +
+  scale_x_continuous(breaks=seq(0,288,24))
+```
+
+```{r}
+PbT2_ts_f1 <- PbT2_ts_f + geom_bar(stat = "identity",
+                    linewidth = 0.001,
+                    width = 0.4)
+```
+
+```{r}
+PbT_HR2 <- ggarrange(PbT2_ts_f1, empty,
+                    PbT2_72, empty,
+                    PbT2_144, empty,
+                    PbT2_288, 
+                    #leg2, 
+                    nrow = 7,
+                    #legend = "bottom",
+                    labels = c('A', '', 'B', '', 'C', '', 'D', ''),
+                    font.label=list(size=6),
+                    align = "v",
+                    #common.legend=TRUE,
+                    legend='none',
+                    heights = c(1,gap,
+                                1,gap,
+                                1,gap,
+                                1
+                                #,0.15
+                                ))
+PbT_HR2 <- annotate_figure(PbT_HR2,
+                left = text_grob('Generation by Timeslice 2025 [PJ]',
+                                 size=6, rot = 90))
+PbT_HR2
+
+```
+
+```{r}
+# ggsave(PbT_HR2, filename = './figures/PbT_HR2.jpg', width = 6, height = 8.5, units = 'cm' )
+# ggsave(PbT_HR2, filename = './figures/PbT_HR2.pdf', width = 6, height = 8.5, units = 'cm' )
+```
+
+# Figure PbT HR 2025-2045
+
+```{r}
+PbT_HiRes <- ggarrange(
+  ggarrange(PbT_HR2, PbT_HR, nrow = 1, widths = c(1,1),
+            font.label=list(size=6), align = "h"),
+  ggarrange(leg, widths = c(2), font.label=list(size=6)),
+  nrow = 2,
+  heights = c(1, 0.075)
+)
+PbT_HiRes
+```
+
+```{r}
+ggsave(PbT_HiRes, filename = './figures/Figure_11thesis.jpg', width = 16, height = 10, units = 'cm' )
+ggsave(PbT_HiRes, filename = './figures/Figure_11thesis.pdf', width = 16, height = 10, units = 'cm' )
+```
+
+```{r}
+PbT %>% filter(YEAR %in% c(2025,2050)) %>% filter(grepl("Residential", Tech_name)) %>% group_by(YEAR, Scenario) %>% 
+    summarise(VALUE=sum(VALUE))
+```
+
+```{r}
+#Pro_b_Tech <- ggarrange(PbT_f, PbT_ts_f,
+#                   nrow = 2, heights = c(1.5,1),
+#                   labels = c('A','B'), font.label=list(size=6), 
+#                   common.legend = TRUE, legend='bottom')
+#Pro_b_Tech
+
+```
+
+```{r}
+#ggsave(Pro_b_Tech, filename = './figures/Pro_b_Tech.jpg', width = 12, height = 8, units = 'cm' )
+#ggsave(Pro_b_Tech, filename = './figures/Pro_b_Tech.pdf', width = 12, height = 8, units = 'cm' )
+```
+
+# New Capacity
+
+```{r}
+bau_accnc <- read.csv("./results/bau_accnc.csv")
+bau_accnc["Scenario"] = sc_bau 
+
+re_accnc <- read.csv("./results/re_accnc.csv")
+re_accnc["Scenario"] = sc_nm
+
+AccNc = rbind(bau_accnc, re_accnc)
+```
+
+```{r}
+AccNc %>% filter(YEAR==2050)
+```
+
+### Figure
+
+```{r}
+rpo <- c("Wind Tech", "Solar Tech", "Solar RPO", "Wind RPO")
+
+AccNc_f <-  AccNc %>%
+    filter(YEAR %in% year_vector) %>%
+    group_by(YEAR, Tech_name, Scenario) %>% 
+    summarise(VALUE=sum(VALUE)) %>% 
+    mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+    filter(VALUE >0) %>% 
+    filter(!Tech_name %in% rpo) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d(direction = -1) +
+   labs(fill = "", x="", y = "Goa \n New Capacity [GW]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   guides(fill = guide_legend(ncol = 3)) +
+   theme(axis.text.x = element_text(angle = 90))
+   
+  
+AccNc_f
+```
+
+## New cap-ren
+
+### Figure
+
+```{r}
+AccNc_f2 <-  AccNc %>%
+    filter(YEAR %in% year_vector) %>%
+    group_by(YEAR, Tech_name, Scenario) %>% 
+    summarise(VALUE=sum(VALUE)) %>% 
+    mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+    filter(Scenario=='RE') %>% 
+    filter(Tech_name %in% rpo) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", x="", y = "New Capacity [GW]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90))
+AccNc_f2
+```
+
+```{r}
+
+# Pro_Accnc_Tech <- ggarrange(AccNc_f, AccNc_f2, ncol=2,
+#                             labels = c('A', 'B'), font.label=list(size=6),
+#                             align = "h",
+#                             legend = "bottom")
+
+```
+
+## Figure new cap(2) + generation(1)
+
+```{r}
+Pro_Accnc_Tech <- ggarrange(
+  ggarrange(AccNc_f, AccNc_f2, nrow = 1,
+             widths = c(1,1), legend = "bottom", labels = c('A', 'B'),
+             font.label=list(size=6), align = "h"),
+  ggarrange(PbT_f, nrow = 1,
+            widths = c(2), legend = "bottom", labels = c('C'),
+            font.label=list(size=6)),
+  nrow = 2)
+Pro_Accnc_Tech
+```
+
+```{r}
+ggsave(Pro_Accnc_Tech, filename = './figures/Figure_07.jpg', width = 12, height = 8, units = 'cm' )
+ggsave(Pro_Accnc_Tech, filename = './figures/Figure_07.pdf', width = 12, height = 8, units = 'cm' )
+```
+
+## New Capacity HighResolution
+
+```{r message=FALSE, warning=FALSE}
+
+
+AccNc_12 <- AccNc %>% 
+  filter(Scenario=='RE') %>% 
+  mutate(TS = '12 TS') %>% 
+  select(-Scenario)
+
+  
+# List of keys
+AccNc_72 = read.csv("./results/re_accnc_72.csv")
+AccNc_72$TS = '72 TS'
+
+AccNc_144 = read.csv("./results/re_accnc_144.csv")
+AccNc_144$TS = '144 TS'
+
+AccNc_288 = read.csv("./results/re_accnc_288.csv")
+AccNc_288$TS = '288 TS'
+
+
+
+AccNC_HR <- rbind(AccNc_12, AccNc_72, AccNc_144, AccNc_288)
+
+hr_list <- c('12 TS', '72 TS',
+             '144 TS', '288 TS')
+```
+
+```{r}
+AccNC_HR_Goa <-  AccNC_HR %>%
+  filter(YEAR %in% year_vector) %>%
+  filter(VALUE >0) %>% 
+  mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+  mutate(TS = factor(TS, levels=hr_list)) %>% 
+  droplevels() %>% 
+  filter(!Tech_name %in% rpo) %>% 
+  ggplot(aes(x=YEAR, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+           linewidth = 0.05, width = 1)+
+  scale_fill_viridis_d(direction = -1) +
+  labs(fill = "", x="", y = "Goa Renewable Capacity [GW]") +
+  facet_grid(TS~.) +
+  rh_theme +
+  guides(fill = guide_legend(ncol = 3)) +
+  theme(axis.text.x = element_text(angle = 0))
+AccNC_HR_Goa
+```
+
+```{r}
+ AccNC_HR %>% 
+   filter(!Tech_name %in% rpo) %>% 
+   filter(YEAR==2050) %>% 
+   filter(VALUE >0) %>% 
+   group_by(Tech_name) %>% 
+   summarise(VALUE=sum(VALUE))
+   
+```
+
+```{r}
+AccNC_HR_out <- AccNC_HR %>% 
+    filter(YEAR %in% year_vector) %>%
+    filter(VALUE >0) %>% 
+    mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+    mutate(TS = factor(TS, levels=hr_list)) %>% 
+    droplevels() %>% 
+    filter(Tech_name %in% rpo) %>% 
+    ggplot(aes(x=YEAR, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 1)+
+   scale_fill_viridis_d(direction = 1) +
+   labs(fill = "", x="", y = "Renewable Capacity Addition [GW]") +
+   facet_grid(TS~.) +
+   rh_theme +
+   guides(fill = guide_legend(ncol = 3)) +
+   theme(axis.text.x = element_text(angle = 0))
+
+AccNC_HR_out
+```
+
+```{r}
+AccNc_HR <- ggarrange(AccNC_HR_Goa, AccNC_HR_out,
+                      nrow = 1,
+                      widths = c(1,1), legend = "bottom",
+                      labels = c('A', 'B'),
+                      font.label=list(size=6),
+                      align = "h", common.legend=FALSE)
+#AccNc_HR <- annotate_figure(PbT_HR, left = text_grob('Generation by Timeslice [PJ]', size=6, rot = 90))
+AccNc_HR
+```
+
+```{r}
+ggsave(AccNc_HR, filename = './figures/AccNc_HR.jpg', width = 12, height = 6, units = 'cm' )
+ggsave(AccNc_HR, filename = './figures/AccNc_HR.pdf', width = 12, height = 6, units = 'cm' )
+```
+
+```{r}
+ AccNC_HR %>% 
+   filter(Tech_name %in% rpo) %>% 
+   filter(YEAR==2050) %>% 
+   filter(VALUE >0) %>% 
+   group_by(Tech_name, 
+            TS) %>% 
+   summarise(VALUE=sum(VALUE))
+```
+
+```{r}
+AccNC_HR %>%
+    filter(YEAR %in% c(2050)) %>%
+    group_by(YEAR, Tech_name, TS) %>% 
+    summarise(VALUE=sum(VALUE))
+    
+  
+```
+
+# Final Energy
+
+## by Sector
+
+```{r}
+bau_fe <- read.csv("./results/bau_fe.csv")
+bau_fe["Scenario"] = sc_bau 
+
+re_fe <- read.csv("./results/re_fe.csv")
+re_fe["Scenario"] = sc_nm
+
+fe_sec = rbind(bau_fe, re_fe)
+```
+
+```{r}
+# #2019
+# 
+# bau_fe <- read.csv("./results/bau_fe.csv")
+# 
+# bau_fe <- bau_fe %>% filter(!YEAR==2019)
+# 
+# re_fe <- read.csv("./results/re_fe.csv")
+# new1 <- re_fe %>% filter(YEAR==2019)
+# 
+# bau_fe <- rbind(bau_fe, new1)
+# 
+# bau_fe["Scenario"] = sc_bau 
+# re_fe["Scenario"] = sc_nm
+# 
+# fe_sec = rbind(bau_fe, re_fe)
+```
+
+```{r}
+fe_sec_f <-  fe_sec %>%
+    filter(YEAR %in% year_vector) %>%
+    group_by(YEAR, Tech_name, Scenario) %>% 
+    summarise(VALUE=sum(VALUE)) %>% 
+    #mutate(Tech_name = factor(Tech_name, levels=P_tech_names)) %>% 
+    #filter(Tech_name %in% c("Wind Tech", "Solar Tech")) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", y = "Final Energy Consuption \n by sector [PJ]") +
+    labs(x = "") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90))
+fe_sec_f
+
+```
+
+```{r}
+fe_sec %>%filter(YEAR %in% c(2019,2050)) %>% filter(Tech_name=='Transport') %>% 
+    group_by(YEAR, Scenario) %>% summarise(sum(VALUE))
+```
+
+## by Fuel
+
+```{r}
+bau_fe_fl <- read.csv("./results/bau_fe_f.csv")
+bau_fe_fl["Scenario"] = sc_bau 
+
+re_fe_fl <- read.csv("./results/re_fe_f.csv")
+re_fe_fl["Scenario"] = sc_nm
+
+fe_fuel = rbind(bau_fe_fl, re_fe_fl)
+```
+
+```{r}
+#
+#2019
+#
+# bau_fe_fl <- read.csv("./results/bau_fe_f.csv")
+# bau_fe_fl <- bau_fe_fl %>% filter(!YEAR==2019)
+# 
+# re_fe_fl <- read.csv("./results/re_fe_f.csv")
+# new2 <- re_fe_fl %>% filter(YEAR==2019)
+# 
+# bau_fe_fl <- rbind(bau_fe_fl, new2)
+# 
+# bau_fe_fl["Scenario"] = sc_bau 
+# re_fe_fl["Scenario"] = sc_nm
+# 
+# 
+# fe_fuel = rbind(bau_fe_fl, re_fe_fl)
+```
+
+```{r}
+fe_fuel_f <-  fe_fuel %>%
+    filter(YEAR %in% year_vector) %>%
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name_finalmix)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", y = "Final Energy Consuption \n by fuel [PJ]") +
+   facet_grid(.~YEAR) +
+    labs(x = "")+
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90))
+fe_fuel_f
+```
+
+```{r}
+fe_fuel %>%filter(YEAR %in% c(2019,2050)) %>% filter(Tech_name_finalmix=='Liquid fossil fuels') %>% 
+    group_by(YEAR, Scenario) %>% summarise(sum(VALUE))
+```
+
+### FE-fuel-secto
+
+```{r}
+FE <- ggarrange(fe_sec_f, fe_fuel_f,
+                   ncol = 1,
+                   labels = c('A','B'), font.label=list(size=6), 
+                   common.legend = FALSE, legend='right', align = "v")
+FE
+```
+
+```{r}
+ggsave(FE, filename = './figures/FE.pdf', width = 12, height = 8, units = 'cm' )
+ggsave(FE, filename = './figures/FE.jpg', width = 12, height = 8, units = 'cm' )
+```
+
+## by Tech-sector mix
+
+```{r}
+bau_fe_sem <- read.csv("./results/bau_sem.csv")
+bau_fe_sem["Scenario"] = sc_bau 
+
+re_fe_sem <- read.csv("./results/re_sem.csv")
+re_fe_sem["Scenario"] = sc_nm
+
+fe_sem = rbind(bau_fe_sem, re_fe_sem)
+```
+
+### Residential, Commercial, Industry
+
+```{r}
+fe_sem1 <- fe_sem %>% 
+  filter(grepl("Resid|Comm|Indu", Tech_name))
+```
+
+```{r}
+fe_sem1_f <-  fe_sem1 %>%
+    filter(YEAR %in% year_vector) %>%
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", x="", y = "Final Energy Consuption \n by Sector [PJ]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90))+
+   #theme(legend.margin = margin(t=-5, b=0, unit='mm'))+
+   guides(fill = guide_legend(ncol = 3))  
+fe_sem1_f
+```
+
+```{r}
+# ggsave(fe_sem1_f, filename = './figures/fe_sem_res_com_ind.pdf', width = 12, height = 8, units = 'cm' )
+# ggsave(fe_sem1_f, filename = './figures/fe_sem_res_com_ind.jpg', width = 12, height = 8, units = 'cm' )
+```
+
+### Agriculture, Fisheries
+
+```{r}
+fe_sem2 <- fe_sem %>% 
+  filter(grepl("Fish|Agri", Tech_name))
+```
+
+```{r}
+fe_sem2 %>% filter(grepl("Agr", Tech_name)) %>% filter(YEAR %in% c(2019))
+fe_sem2 %>% filter(grepl("Fish",Tech_name)) %>% filter(YEAR %in% c(2019, 2050))
+
+
+```
+
+```{r}
+fe_sem2_f <-  fe_sem2 %>%
+    filter(YEAR %in% year_vector) %>%
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", x="", y = "Final Energy Consuption \n by Sector [PJ]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90))+
+   theme(legend.margin = margin(t=-5, b=0, unit='mm'))+
+   guides(fill = guide_legend(ncol = 3)) 
+fe_sem2_f
+```
+
+```{r}
+FE2 <-  ggarrange(fe_sem1_f, fe_sem2_f, nrow = 2,
+             widths = c(1,1), legend = "bottom", labels = c('A', 'B'),
+             font.label=list(size=6), align = "h")
+FE2
+```
+
+```{r}
+ggsave(FE2, filename = './figures/fe_sem_res_com_ind.pdf', width = 12, height = 8, units = 'cm' )
+ggsave(FE2, filename = './figures/fe_sem_res_com_ind.jpg', width = 12, height = 8, units = 'cm' )
+```
+
+### Cooking
+
+```{r}
+fe_sem %>%
+  filter(grepl("Cooking urban|Cooking rural", Tech_name)) %>% 
+  filter(YEAR %in% c(2019,2050)) %>% 
+  filter(Scenario=="Bau")
+```
+
+```{r}
+fe_sem3_u_f <- fe_sem %>%
+  filter(grepl("Cooking urban", Tech_name)) %>% 
+  filter(YEAR %in% year_vector) %>%
+  mutate(Tech_name = str_replace(Tech_name, "Cooking urban", "Urban")) %>% 
+  ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+           linewidth = 0.05, width = 0.4)+
+  scale_fill_viridis_d() +
+  labs(fill = "", x="",y = "Final Energy Consuption [PJ]") +
+  facet_grid(.~YEAR) +
+  theme_bw() + #+
+  rh_theme +
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(legend.margin = margin(t=-5, b=0, unit='mm'))
+fe_sem3_u_f
+```
+
+```{r}
+fe_sem3_r_f <- fe_sem %>%
+  filter(grepl("Cooking rural", Tech_name)) %>% 
+  filter(YEAR %in% year_vector) %>%
+  mutate(Tech_name = str_replace(Tech_name, "Cooking rural", "Rural")) %>% 
+  #mutate(Sector = ifelse(grepl("rural", Tech_name), "Rural", "Urban")) %>% 
+  ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+           linewidth = 0.05, width = 0.4)+
+  scale_fill_viridis_d() +
+  labs(fill = "",  x="", y = "Final Energy Consuption [PJ]") +
+  facet_grid(.~YEAR) +
+  theme_bw() + #+
+  rh_theme +
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(legend.margin = margin(t=-5, b=0, unit='mm'))
+fe_sem3_r_f
+```
+
+```{r}
+COOK <- ggarrange(fe_sem3_u_f, fe_sem3_r_f,
+                   ncol = 1,
+                   labels = c('A','B'), font.label=list(size=6), 
+                   common.legend = FALSE, legend='bottom', align = "v")
+COOK
+```
+
+```{r}
+ggsave(COOK, filename = './figures/Cook.pdf', width = 12, height = 8, units = 'cm' )
+ggsave(COOK, filename = './figures/Cook.jpg', width = 12, height = 8, units = 'cm' )
+```
+
+### Transport
+
+```{r}
+
+```
+
+```{r}
+fe_sem4_FTR_f <-  fe_sem4 %>%
+    filter(grepl("FTR", Tech_name)) %>% 
+    filter(YEAR %in% year_vector) %>%
+    mutate(Tech_name = str_replace(Tech_name, "FTR-", "")) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", x="", y = "Freight Final \n Energy Consuption [PJ]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90)) +
+   theme(legend.margin = margin(t=-5, b=0, unit='mm')) +
+   theme(legend.text = element_text(size = 4))+
+   guides(fill = guide_legend(ncol = 6))
+fe_sem4_FTR_f
+```
+
+```{r}
+fe_sem4 %>% filter(grepl("FTR", Tech_name)) %>% filter(YEAR %in% year_vector) %>% filter(YEAR %in% c(2019,2050)) %>% group_by(Scenario, YEAR) %>% summarise(sum(VALUE))
+```
+
+```{r}
+fe_sem4_PTR_f <-  fe_sem4 %>%
+    filter(grepl("PTR", Tech_name)) %>% 
+    filter(YEAR %in% year_vector) %>%
+    mutate(Tech_name = str_replace(Tech_name, "PTR-", "")) %>% 
+    ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+    geom_bar(stat = "identity", colour= "black",
+                    linewidth = 0.05, width = 0.4)+
+   scale_fill_viridis_d() +
+   labs(fill = "", x="", y = "Passenger Final \n Energy Consuption [PJ]") +
+   facet_grid(.~YEAR) +
+   theme_bw() + #+
+   rh_theme +
+   theme(axis.text.x = element_text(angle = 90)) +
+   theme(legend.margin = margin(t=-5, b=0, unit='mm')) +
+   theme(legend.text = element_text(size = 4))+
+   guides(fill = guide_legend(ncol = 6))
+fe_sem4_PTR_f
+```
+
+```{r}
+fe_sem4 %>% filter(grepl("PTR", Tech_name)) %>% filter(YEAR %in% year_vector) %>% filter(YEAR %in% c(2019,2050)) %>% group_by(Scenario, YEAR) %>% summarise(sum(VALUE))
+```
+
+```{r}
+Transport <- ggarrange(fe_sem4_FTR_f, fe_sem4_PTR_f,
+                   ncol = 1, heights = c(1,1.25),
+                   labels = c('A','B'), font.label=list(size=6), 
+                   common.legend = FALSE, legend='bottom', align = "v")
+Transport
+```
+
+```{r}
+ggsave(Transport, filename = './figures/Transport.pdf', width = 12, height = 8, units = 'cm' )
+ggsave(Transport, filename = './figures/Transport.jpg', width = 12, height = 8, units = 'cm' )
+```
+
+# Emissions
+
+```{r warning=FALSE}
+
+bau_aet <- read.csv("./results/bau_aet.csv")
+bau_aet["Scenario"] = sc_bau 
+
+re_aet <- read.csv("./results/re_aet.csv")
+re_aet["Scenario"] = sc_nm
+
+aet = rbind(bau_aet, re_aet)
+```
+
+```{r warning=FALSE}
+aet_names <- c("Agriculture-mecanization", "Agriculture-pump",
+               "Cooking urban", "Cooking rural",
+               "Fisheries", "Industry", "Transport",
+               "CCGT", "Biomass PP", "Coal PP")
+            
+```
+
+```{r warning=FALSE}
+aet_f <- aet %>%
+  filter(YEAR %in% year_vector) %>%
+  mutate(Tech_name = ifelse(grepl("Import", Tech_name),
+                            "Coal PP", Tech_name)) %>%
+  mutate(Tech_name = factor(Tech_name, levels=aet_names)) %>%
+  mutate(VALUE = VALUE/1000) %>% 
+  ggplot(aes(x=Scenario, y=VALUE, fill=Tech_name)) +
+  geom_bar(stat = "identity", colour= "black",
+           linewidth = 0.05, width = 0.4) +
+  scale_fill_viridis_d(direction = -1) +
+  labs(fill = "", x="", y = "CO2 Emissions [Mton]") +
+  facet_grid(.~YEAR) +
+  rh_theme +
+  scale_fill_grey(start = 0.9, end = 0.1, na.value = "red", aesthetics = "fill") +
+  guides(fill = guide_legend(ncol = 6))  +
+  theme(axis.text.x = element_text(angle = 90, size = 5))+
+  theme(legend.margin = margin(t=-5, b=0, unit='mm'))
+aet_f
+```
+
+```{r warning=FALSE}
+ggsave(aet_f, filename = './figures/aet.pdf', width = 12, height = 6, units = 'cm' )
+ggsave(aet_f, filename = './figures/aet.jpg', width = 12, height = 6, units = 'cm' )
+```
+
+```{r warning=FALSE}
+aet_f2 <- aet %>%
+  filter(YEAR %in% year_vector) %>%
+  mutate(Tech_name = ifelse(grepl("Import", Tech_name),
+                            "Coal PP", Tech_name)) %>%
+  mutate(Tech_name = factor(Tech_name, levels=aet_names)) %>%
+  ggplot( aes(x=Tech_name, y=VALUE) ) +
+  #geom_segment( aes(x=Tech_name ,xend=Tech_name, y=0, yend=VALUE), color="grey") +
+  #geom_point(size=3, color="#69b3a2") +
+  geom_bar(stat = "identity", colour= "black",
+           linewidth = 0.05, width = 0.4) +
+  
+  
+  coord_flip() +
+  rh_theme +
+  facet_grid(Scenario~YEAR) +
+  theme(
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none"
+    ) +
+  xlab("")
+aet_f2
+```
+
+```{r warning=FALSE}
+aet %>% filter(YEAR %in% c(2019, 2050)) %>%
+  mutate(Tech_name = ifelse(grepl("Import", Tech_name), "Coal PP", Tech_name)) #%>%
+  #group_by(YEAR, Scenario) %>% summarise(sum(VALUE))
+```
+
+## Emission reduction
+
+```{r}
+
+emi_red <- read_xlsx("../Emissions_reduction.xlsx", sheet = 'E_total')
+emi_red
+```
+
+```{r}
+emi_red_f <- emi_red %>% 
+  pivot_longer(!y,
+     names_to = 'Emission',
+     values_to = 'VALUE'
+   ) %>%
+  filter(y %in% year_vector) %>% 
+  ggplot() +
+  geom_line(data=. %>% 
+              filter(Emission %in% c('BAU', 'RE')), 
+                     aes(x=y, y=VALUE, color=Emission),
+                     linewidth=0.30) +
+  geom_point(data=. %>% 
+              filter(Emission %in% c('BAU', 'RE')),
+             aes(x=y, y=VALUE, shape=Emission, color=Emission),
+             size=0.750) +
+  geom_bar(data=. %>% 
+              filter(!Emission %in% c('BAU', 'RE', 'sec_bau', 'trans_bau')),
+           aes(x=y, y=VALUE, fill=Emission),
+           stat = "identity", colour= "black",
+           linewidth = 0.05, width = 1, alpha=0.50) +
+  rh_theme +
+  labs(color = "", x="", y = "CO2 Emissions [Mton]",
+       shape='', fill='')+
+  scale_x_continuous(breaks = seq(2020, 2050, by=5))+
+  #scale_y_continuous(limits= c(0,15),breaks = seq(0, 15, by=2.5))+
+  scale_color_brewer(type='div', palette = 'Dark2', direction = -1) +
+  scale_fill_grey()
+
+emi_red_f
+```
+
+```{r}
+ggsave(emi_red_f, filename = './figures/emi_red_f.pdf', width = 10, height = 6, units = 'cm' )
+ggsave(emi_red_f, filename = './figures/emi_red_f.jpg', width = 10, height = 6, units = 'cm' )
+```
+
+# Specific Demand Profile
+
+```{r}
+sdp <- read.csv('./spec_demand_pro/spec_dem_prof.csv')
+head(sdp)
+```
+
+```{r}
+sdp_f <- sdp %>% 
+  filter(!FUEL == 'AGRELC') %>% 
+  mutate(TR = factor(TR, levels=hr_list)) %>% 
+  ggplot() +
+  geom_line(aes(x=TIMESLICE, y=VALUE), color='darkblue', size=0.20) +
+  geom_point(data = . %>% filter(VALUE>0.75),
+             aes(x=TIMESLICE, y=VALUE), color='darkred', size=0.10, alpha=0.75) +
+  facet_grid(FUEL ~ TR, scales = 'free_x') +
+  rh_theme +  # Assuming rh_theme is a function that returns a theme
+  labs(fill = "", x="", y = "")
+sdp_f
+```
+
+```{r}
+ggsave(sdp_f, filename = './figures/sdp_f.pdf', width = 12, height = 6, units = 'cm' )
+ggsave(sdp_f, filename = './figures/sdp_f.jpg', width = 12, height = 6, units = 'cm' )
+
+```
+
+# Coal max generation vs actual
+
+```{r}
+cgen_bau <- read.csv('./results/coal_dif_gen_bau.csv')
+cgen_re <-  read.csv('./results/coal_dif_gen_re.csv')
+
+cgen <- cgen_bau %>% 
+  left_join(cgen_re %>% select(all_of(c('YEAR','ac_gen_re')))
+            , by=c('YEAR')) %>%
+  rename(max = max_gen_bau,
+         ac_BAU = ac_gen_bau,
+         '12 TS' = ac_gen_re ) %>% 
+  select(!c(Tech_name, X)) %>% 
+  pivot_longer(!YEAR,
+     names_to = 'TR',
+     values_to = 'VALUE'
+   )
+cgen
+```
+
+```{r}
+coal_72 <- filter_coal(re_PbT_72, '72 TS') 
+coal_144 <- filter_coal(re_PbT_144, '144 TS')
+coal_288 <- filter_coal(re_PbT_288, '288 TS')
+
+#bind all data frames
+cgen <- rbind(cgen, coal_72, coal_144, coal_288)
+cgen
+```
+
+```{r}
+cg_list <-  c('max', 'ac_BAU', '12 TS', '72 TS', '144 TS', '288 TS')
+
+cgen_f <- cgen %>%
+  mutate(TR = factor(TR, levels=cg_list)) %>%
+  ggplot(aes(x=YEAR, y=VALUE, group=TR)) +
+  geom_line(aes(color=TR), size=0.25) +
+  geom_point(aes(shape= TR, color=TR), size=0.15, alpha=0.75) +
+  rh_theme +  # Assuming rh_theme is a function that returns a theme
+  labs(color = "", x="", y = 'Generation [PJ]', shape='')+
+  scale_x_continuous(breaks = seq(2020, 2050, by=5))+
+  scale_y_continuous(limits= c(0,15),breaks = seq(0, 15, by=2.5))+
+  scale_color_brewer(type='div' ,palette = 'Dark2') 
+cgen_f
+```
+
+```{r}
+ggsave(cgen_f, filename = './figures/cgen_f.pdf', width = 12, height = 6, units = 'cm' )
+ggsave(cgen_f, filename = './figures/cgen_f.jpg', width = 12, height = 6, units = 'cm' )
+```
+
+# Goa capacity
+
+```{r}
+goa_cap <- data.frame(
+  Power_Plant = c('Coal', 'Coal', 'Nuclear', 'NGS', 'NGS', 'Wind', 'Solar'),
+  Sector = c('Central', 'Private', 'Central', 'Central', 'Private', 'RPO', 'RPO'),
+  Capacity = c(572.4, 12, 31.5, 25.1, 60, 31, 50)
+)
+goa_cap$Type_sector <- paste(goa_cap$Power_Plant, goa_cap$Sector) 
+#   pivot_longer(cols = starts_with('Sec'),
+#                names)
+goa_cap
+```
+
+## Figure
+
+```{r}
+#https://r-charts.com/part-whole/pie-chart-ggplot2/
+
+# The palette with black:
+cbPalette <- c("#999999", "#cfcfcf", "#D55E00","#acace6", "#663399","#F0E442", "#56B4E9")
+
+goa_cap_f <- goa_cap %>% 
+  ggplot(aes(x='', y=Capacity, fill=Type_sector))+
+  geom_bar(stat = 'identity', width=1, colour= "white", linewidth = 0.05)+
+  coord_polar('y', start=0)+
+  geom_text(aes(label = Capacity), position = position_stack(vjust=0.5), size=2,
+            color="black")+
+  rh_theme+
+  labs(x = NULL, y = NULL, fill = NULL)+
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank())+
+  scale_fill_manual(values=cbPalette)
+
+goa_cap_f
+```
+
+```{r}
+ggsave(goa_cap_f, filename = './figures/Figure_02.pdf', width = 8, height = 6, units = 'cm' )
+ggsave(goa_cap_f, filename = './figures/Figure_02.jpg', width = 8, height = 6, units = 'cm' )
+```
